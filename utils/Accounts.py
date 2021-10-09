@@ -1,3 +1,4 @@
+import datetime
 import random
 import string
 from CodePlay.models.Accounts import SessionPool
@@ -13,6 +14,9 @@ def setSessionId(res):
 def verifySessionId(sessionId):
     sessionRecord = SessionPool.objects.filter(sessionId=sessionId).first()
     if sessionRecord:
+        if sessionRecord.expireAt < datetime.datetime.now():
+            SessionPool.objects.filter(sessionId=sessionId).delete()
+            return None
         return sessionRecord.user.__dict__
     else:
         return None

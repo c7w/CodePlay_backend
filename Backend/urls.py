@@ -14,11 +14,13 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from . import views
+import CodePlay
 from django.urls import path, include
 from django.contrib.staticfiles import views as vv
 
 urlpatterns = [
     # path('admin/', admin.site.urls),
     path('', views.index),
-    path('login', views.login)
+    path('login', views.login),
+    path('api/', include('CodePlay.urls'))
 ]
