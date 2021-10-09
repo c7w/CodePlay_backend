@@ -1,8 +1,7 @@
-import time
-import math
-import datetime
+import random
 from django import db
 from django.db import models
+from django.forms.models import model_to_dict
 import requests
 import json
 import Backend.settings as settings
@@ -47,18 +46,23 @@ def userinfo(req):
     else:
         # Verify and promote to Designer with 339BD665D02F8C3E8DD262B59D67A904
         POST = json.loads(req.body)
-        sid = POST.get('student_id')
+        sessionId = POST.get('sessionId')
         key = POST.get('key')
-        if (not sid) or (not key):
+        if not sessionId:
+            return HttpResponseBadRequest('Please query with sessionId')
+        sessionRecord = SessionPool.objects.filter(sessionId=sessionId).first()
+        if not sessionRecord:
+            return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
+        user = sessionRecord.user
+        if (not key):
             return HttpResponseBadRequest('bad request')
         if key != '339BD665D02F8C3E8DD262B59D67A904':
-            return HttpResponse(json.dumps({"status": "failed"}, ensure_ascii=False))
-        user = User.objects.filter(student_id=sid).first()
-        if not user:
-            return HttpResponseBadRequest('user not found')
+            return HttpResponse(json.dumps({"status": "key verification failed"}, ensure_ascii=False))
         user.role = "Designer"
         user.save()
-        return HttpResponse(json.dumps({"status": "ok"}, ensure_ascii=False))
+        dic = user.__dict__
+        dic.pop('_state')
+        return HttpResponse(json.dumps(dic, ensure_ascii=False))
 
 def userScheme(req):
     if req.method == 'GET':
@@ -94,9 +98,8 @@ def userScheme(req):
         # Sort
         sortDict = {
             "submission_time": (lambda x : x['submission_time'], False),
-            "vote": (lambda x: x['vote_count'], True),
+            "vote": (lambda x: x['likes'], True),
             "hue": (lambda x: x['colors'][0][4], False ),
-            "designer_name": (lambda x: x['author']['name'], False)
         }
         try:
             sortMethod = sortDict[sortStrategy]
@@ -122,10 +125,21 @@ def userScheme(req):
             scheme.save()
             dic = scheme.__dict__
             dic.pop('_state')
-            return HttpResponse(str(dic))
+            return HttpResponse(json.dumps(dic, ensure_ascii=False))
         elif operation == 'update':
+
             scheme = Scheme.objects.filter(id=schemeId).first()
             if scheme:
+                # Verify user permission
+                if not sessionId:
+                    return HttpResponseBadRequest('Please query with sessionId')
+                user = verifySessionId(sessionId)
+                if not user:
+                    return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
+                if scheme.author_id != user.student_id:
+                    return HttpResponse(json.dumps({'status': 'permission denied'}))
+                
+                # Update properties
                 if name:
                     scheme.name = name
                 if description:
@@ -135,7 +149,7 @@ def userScheme(req):
                 scheme.save()
                 dic = scheme.__dict__
                 dic.pop('_state')
-                return HttpResponse(str(dic))
+                return HttpResponse(json.dumps(dic, ensure_ascii=False))
             else:
                 return HttpResponse(json.dumps({'status': 'not found'}))
             
@@ -146,19 +160,124 @@ def userScheme(req):
                 scheme.save()
                 dic = scheme.__dict__
                 dic.pop('_state')
-                return HttpResponse(str(dic))
+                return HttpResponse(json.dumps(dic, ensure_ascii=False))
             else:
                 return HttpResponse(json.dumps({'status': 'not found'}))
+            
+        elif operation == 'approve':
+            
+            # Verify user permission
+            if not sessionId:
+                return HttpResponseBadRequest('Please query with sessionId')
+            user = verifySessionId(sessionId)
+            if not user:
+                return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
+            if user['role'] != 'Designer':
+                return HttpResponse(json.dumps({'status': 'permission denied'}))
+
+            scheme = Scheme.objects.filter(id=schemeId).first()
+            if scheme:
+                scheme.approved = True
+                scheme.save()
+                dic = scheme.__dict__
+                dic.pop('_state')
+                return HttpResponse(json.dumps(dic, ensure_ascii=False))
+            else:
+                return HttpResponse(json.dumps({'status': 'not found'}))
+            
+        elif operation == 'disapprove':
+            
+            # Verify user permission
+            if not sessionId:
+                return HttpResponseBadRequest('Please query with sessionId')
+            user = verifySessionId(sessionId)
+            if not user:
+                return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
+            if user['role'] != 'Designer':
+                return HttpResponse(json.dumps({'status': 'permission denied'}))
+
+            scheme = Scheme.objects.filter(id=schemeId).first()
+            if scheme:
+                scheme.approved = False
+                scheme.save()
+                dic = scheme.__dict__
+                dic.pop('_state')
+                return HttpResponse(json.dumps(dic, ensure_ascii=False))
+            else:
+                return HttpResponse(json.dumps({'status': 'not found'}))
+
         elif operation == 'delete':
             deletedScheme = Scheme.objects.filter(id=schemeId).first()
             if deletedScheme:
+                
+                # Verify user permission
+                if not sessionId:
+                    return HttpResponseBadRequest('Please query with sessionId')
+                user = verifySessionId(sessionId)
+                if not user:
+                    return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
+                if deletedScheme.author_id != user.student_id:
+                    return HttpResponse(json.dumps({'status': 'permission denied'}))
+                
                 deletedScheme.hidden = True
                 deletedScheme.save()
                 dic = deletedScheme.__dict__
                 dic.pop('_state')
-                return HttpResponse(str(dic))
+                return HttpResponse(json.dumps(dic, ensure_ascii=False))
             else:
                 return HttpResponse(json.dumps({'status': 'not found'}))
 
-def listScheme():
-    pass
+def exploreScheme(req):
+    sketch_id = req.GET.get('sketch_id')
+    sessionId = req.GET.get('sessionId')
+    sortStrategy = req.GET.get('sort_strategy')
+    approvedOnly = req.GET.get('approved')
+    if not sessionId:
+        return HttpResponseBadRequest('Please query with sessionId')
+    if not sketch_id:
+        return HttpResponseBadRequest('Please query with sketch_id')
+    user = verifySessionId(sessionId)
+    if not user:
+        return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
+
+    result = {"schemes": []}
+    if user['role'] == 'Designer':
+        
+        # Approved Only
+        schemeList = Scheme.objects.all()
+        if approvedOnly:
+            schemeList = schemeList.filter(approved=True)
+
+        # Sort
+        sortDict = {
+            "submission_time": (lambda x: x['submission_time'], False),
+            "vote": (lambda x: x['likes'], True),
+            "hue": (lambda x: x['colors'][0][4], False),
+            "designer_name": (lambda x: x['author']['name'], False)
+        }
+        try:
+            sortMethod = sortDict[sortStrategy]
+        except:
+            sortMethod = sortDict['submission_time']
+        
+        length = len(schemeList)
+        if length != 0:
+            for i in range(0, length):
+                dic = model_to_dict(schemeList[i])
+                dic['colors'] = list(eval(dic['colors']))
+                dic['author'] = model_to_dict(schemeList[i].author)
+                result['schemes'].append(dic)
+        result['schemes'] = sorted(result['schemes'], key=sortMethod[0], reverse=sortMethod[1])
+        return HttpResponse(json.dumps(result, ensure_ascii=False))
+    else:
+        schemeList = Scheme.objects.filter(hidden=False)
+        length = len(schemeList)
+        if length != 0:
+            i = random.randint(0, length-1)
+            dic = schemeList[i].__dict__
+            dic.pop('_state')
+            dic['colors'] = list(eval(dic['colors']))
+            result['schemes'].append(dic)
+        return HttpResponse(json.dumps(result, ensure_ascii=False))
+        
+        

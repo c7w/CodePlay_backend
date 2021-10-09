@@ -5,4 +5,5 @@ from django.contrib.staticfiles import views as vv
 urlpatterns = [
     path('userinfo', views.userinfo),
     path('userScheme', views.userScheme),
+    path('exploreScheme', views.exploreScheme),
 ]

@@ -40,7 +40,7 @@
 
 **Request body** (Content-Type: application/json)
 
-+ student_id
++ sessionId
 + key (需要在 js 中先 MD5)
 
 ```json
@@ -54,7 +54,11 @@
 
 + 用于将用户提权至 Designer
 + 需要输入正确的口令 `CODEplayDESIGNER`
-+ 输入正确则提权并返回{"status": "ok"}，否则返回{"status": "failed"}
++ 输入正确则提权并返回用户信息，否则返回 {"status": "key verification failed"}
+
+```json
+{"student_id": 2020010951, "name": "cc7w", "fullname": "高焕昂", "email": "gha20@mails.tsinghua.edu.cn", "role": "Designer"}
+```
 
 ### `/api/userScheme`
 
@@ -64,7 +68,7 @@
 
 + sessionId
 + student_id
-+ sort_strategy: "submission_time", "vote", "hue", 'designer_name"
++ sort_strategy: "submission_time", "vote", "hue"
 
 **Response**
 
@@ -77,7 +81,8 @@
 
 **Request Body**
 
-+ operation: "create", "update", "vote", "delete"
++ operation: "create", "update", "vote", "delete", "approve", "disapprove"
++ sessionId (Only author could modify his or her own work, "approve" and "disapprove" only accessible to Designers)
 + id (Must provide if "update", "vote", "delete")
 + colors (Must fully provide if "create" or "update")
   + Presented in a list of lists, where each secondary list is [R,G,B,A,H,S,V]
@@ -92,6 +97,7 @@
 
 ```json
 {
+  "sessionId": "sessionId",
   "operation": "create",
   "sketch_id": 1,
   "author_id": 2020010951,
@@ -107,6 +113,7 @@
 
 ```json
 {
+  "sessionId": "sessionId",
   "operation": "update",
   "id": 3,
   "name": "Runtime Errrrrrrrorrrrrrr",
@@ -121,6 +128,7 @@
 
 ```json
 {
+  "sessionId": "sessionId",
   "operation": "vote",
   "id": 3
 }
@@ -128,18 +136,405 @@
 
 ```json
 {
+  "sessionId": "sessionId",
   "operation": "delete",
+  "id": 3
+}
+```
+
+```json
+{
+  "sessionId": "sessionId",
+  "operation": "approve",
+  "id": 3
+}
+```
+
+```json
+{
+  "sessionId": "sessionId",
+  "operation": "disapprove",
   "id": 3
 }
 ```
 
 **Response**
 
+注意这里 colors 为了存储方便，为 string 类型。
+
 ```
-{'id': 3, 'submission_time': datetime.datetime(2021, 10, 9, 18, 33, 51, 951358), 'sketch_id': 1, 'name': 'Runtime Errrrrrrrorrrrrrr', 'description': 'Code Play GO GOGOOGOGOGOGO', 'likes': 14, 'author_id': 2020010951, 'hidden': False, 'colors': '[[0, 0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1, 1], [0.114514, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]]'}
+{
+    "id":6,
+    "submission_time":1633798831.651342,
+    "sketch_id":1,
+    "name":"Wrong Answer",
+    "description":"Code Play GO GO GO",
+    "likes":0,
+    "approved":false,
+    "author_id":2020010951,
+    "hidden":false,
+    "colors":"[[0, 0, 0, 0.2, 0, 0, 0], [1, 1, 1, 1, 1, 1, 1], [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]]"
+}
 ```
 
+### `/api/exploreScheme`
 
+[GET]
+
+**Request Params**
+
++ sessionId
++ sketch_id
++ sort_strategy: "submission_time"(default), "vote", "hue", 'designer_name"
++ approved: (当提供本参数时 仅展示遴选后的结果)
+
+**Response**
+
+会根据玩家的权限，返回不同的排序后的 Scheme Model.
+
+如果玩家是 User，只会返回随机一张，无视 sort_strategy 与 approved。
+
+```json
+{
+    "schemes":[
+        {
+            "id":3,
+            "submission_time":1633797634,
+            "sketch_id":1,
+            "name":"Runtime Errrrrrrrorrrrrrr",
+            "description":"Code Play GO GOGOOGOGOGOGO",
+            "likes":14,
+            "approved":false,
+            "author":{
+                "student_id":2020010951,
+                "name":"cc7w",
+                "fullname":"高焕昂",
+                "email":"gha20@mails.tsinghua.edu.cn",
+                "role":"Designer"
+            },
+            "hidden":true,
+            "colors":[
+                [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                [
+                    0.114514,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5
+                ]
+            ]
+        }
+    ]
+}
+```
+
+如果是 Designer，会返回所有 Scheme 的列表。
+
+// 这里后续要不要加分页需求
+
+```json
+{
+    "schemes":[
+        {
+            "id":3,
+            "submission_time":1633797634,
+            "sketch_id":1,
+            "name":"Runtime Errrrrrrrorrrrrrr",
+            "description":"Code Play GO GOGOOGOGOGOGO",
+            "likes":14,
+            "approved":false,
+            "author":{
+                "student_id":2020010951,
+                "name":"cc7w",
+                "fullname":"高焕昂",
+                "email":"gha20@mails.tsinghua.edu.cn",
+                "role":"Designer"
+            },
+            "hidden":true,
+            "colors":[
+                [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                [
+                    0.114514,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5
+                ]
+            ]
+        },
+        {
+            "id":1,
+            "submission_time":1633797654,
+            "sketch_id":1,
+            "name":"Runtime Error",
+            "description":"Code Play GO GO GO",
+            "likes":0,
+            "approved":false,
+            "author":{
+                "student_id":2020010951,
+                "name":"cc7w",
+                "fullname":"高焕昂",
+                "email":"gha20@mails.tsinghua.edu.cn",
+                "role":"Designer"
+            },
+            "hidden":false,
+            "colors":[
+                [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                [
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5
+                ]
+            ]
+        },
+        {
+            "id":2,
+            "submission_time":1633797644,
+            "sketch_id":1,
+            "name":"Runtime Error",
+            "description":"Code Play GO GO GO",
+            "likes":0,
+            "approved":false,
+            "author":{
+                "student_id":2020010951,
+                "name":"cc7w",
+                "fullname":"高焕昂",
+                "email":"gha20@mails.tsinghua.edu.cn",
+                "role":"Designer"
+            },
+            "hidden":false,
+            "colors":[
+                [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                [
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5
+                ]
+            ]
+        },
+        {
+            "id":4,
+            "submission_time":1633797624,
+            "sketch_id":1,
+            "name":"Runtime Error",
+            "description":"Code Play GO GO GO",
+            "likes":0,
+            "approved":false,
+            "author":{
+                "student_id":2020010951,
+                "name":"cc7w",
+                "fullname":"高焕昂",
+                "email":"gha20@mails.tsinghua.edu.cn",
+                "role":"Designer"
+            },
+            "hidden":false,
+            "colors":[
+                [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                [
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5
+                ]
+            ]
+        },
+        {
+            "id":5,
+            "submission_time":1633798717,
+            "sketch_id":1,
+            "name":"Accepted",
+            "description":"Code Play GO GO GO",
+            "likes":0,
+            "approved":false,
+            "author":{
+                "student_id":2020010951,
+                "name":"cc7w",
+                "fullname":"高焕昂",
+                "email":"gha20@mails.tsinghua.edu.cn",
+                "role":"Designer"
+            },
+            "hidden":false,
+            "colors":[
+                [
+                    0,
+                    0,
+                    0,
+                    0.2,
+                    0,
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                [
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5
+                ]
+            ]
+        },
+        {
+            "id":6,
+            "submission_time":1633798831,
+            "sketch_id":1,
+            "name":"Wrong Answer",
+            "description":"Code Play GO GO GO",
+            "likes":0,
+            "approved":false,
+            "author":{
+                "student_id":2020010951,
+                "name":"cc7w",
+                "fullname":"高焕昂",
+                "email":"gha20@mails.tsinghua.edu.cn",
+                "role":"Designer"
+            },
+            "hidden":false,
+            "colors":[
+                [
+                    0,
+                    0,
+                    0,
+                    0.2,
+                    0,
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                [
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5
+                ]
+            ]
+        }
+    ]
+}
+```
+
+如果想对 scheme 修改请调用 `[POST] /api/userScheme`。
 
 ## Models
 
@@ -161,3 +556,68 @@
 }
 ```
 
+
+
+## 与 Account9 的对接流程
+
+### 应用信息
+
++ 客户端ID（Client ID）	8pKCWELExLFMkeqA4qZ8cpNItD0
++ 客户端密码（Client Secret）	shfKjrGJeS9EsYFlDHuQ
+
+### Step. 1
+
+Browser:
+https://stu.cs.tsinghua.edu.cn/api/v2/authorize?response_type=code&client_id=8pKCWELExLFMkeqA4qZ8cpNItD0&redirect_uri=https://cc7w.cf
+
+Redirect to:
+http://cc7w.cf/?code=h2woy5nn4wv&state=you_should_specify_a_state
+
+### Step. 2
+
+[POST] https://stu.cs.tsinghua.edu.cn/api/v2/access_token
+
+**Request Body**
+
+```json
+{
+  "client_id": "8pKCWELExLFMkeqA4qZ8cpNItD0",
+  "client_secret": "shfKjrGJeS9EsYFlDHuQ",
+  "code": "qo6sfd1mzpr",
+  "redirect_uri": "https://cc7w.cf"
+}
+```
+
+**Response Body**
+
+```json
+{
+    "access_token": "nk92jtejv6i",
+    "refresh_token": "l2yj5l29wpf",
+    "expires_in": 2591999
+}
+```
+
+### Step. 3
+[GET] https://stu.cs.tsinghua.edu.cn/api/v2/userinfo?access_token=nk92jtejv6i
+
+**Response Body**
+
+```json
+{
+    "err": null,
+    "user":{
+        "name": "cc7w",
+        "fullname": "高焕昂",
+        "student_id": "2020010951",
+        "email": "gha20@mails.tsinghua.edu.cn",
+        "student_type": "bachelor",
+        "year": 2020,
+        "class_number": 4,
+        "mobile": "",
+        "groups":[
+        	"undergraduate20204"
+        ]
+    }
+}
+```

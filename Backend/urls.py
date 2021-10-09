@@ -22,5 +22,6 @@ urlpatterns = [
     # path('admin/', admin.site.urls),
     path('', views.index),
     path('login', views.login),
+    path('logout', views.logout),
     path('api/', include('CodePlay.urls'))
 ]

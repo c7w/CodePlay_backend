@@ -24,17 +24,11 @@ def index(req):
     
     # If sessionId does not exist, then the user cannot be logged in
     if not sessionId:
-        res = redirect('/login')
+        res = redirect('/')
         setSessionId(res)
         return res
     
-    # Verify if the sessionId has been binded to a certain user
-    user = verifySessionId(sessionId)
-    if not user:
-        return redirect('/login')
-    
-    props = {"page": {"userinfo": str(user)}}
-    return render(req, 'base.html', props)
+    return render(req, 'base.html')
 
 def login(req):
     sessionId = getSessionId(req)
@@ -65,7 +59,6 @@ def login(req):
     # Step 3
     userinfo = requests.get(
         f'https://stu.cs.tsinghua.edu.cn/api/v2/userinfo?access_token={access_token}').json()['user']
-    print(userinfo)
     # Find the user with certain StuID
     user = User.objects.filter(student_id=userinfo['student_id']).first()
     if not user:
@@ -75,3 +68,17 @@ def login(req):
     # Bind sessionId to user
     sessionRecord = SessionPool.objects.create(sessionId=sessionId, user=user)
     return redirect('/')
+
+def logout(req):
+    sessionId = getSessionId(req)
+    # If sessionId does not exist, then the user cannot be logged out
+    if not sessionId:
+        res = redirect('/')
+        setSessionId(res)
+        return res
+    sessionRecord = SessionPool.objects.filter(sessionId=sessionId).first()
+    if sessionRecord:
+        SessionPool.objects.filter(sessionId=sessionId).delete()
+        return redirect('/')
+    else:
+        return redirect('/')
