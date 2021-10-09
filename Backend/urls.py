@@ -20,4 +20,5 @@ from django.contrib.staticfiles import views as vv
 urlpatterns = [
     # path('admin/', admin.site.urls),
     path('', views.index),
+    path('login', views.login)
 ]
