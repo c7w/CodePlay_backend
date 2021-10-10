@@ -5,7 +5,7 @@ from django.forms.models import model_to_dict
 import requests
 import json
 import Backend.settings as settings
-from django.http.response import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound
+from django.http.response import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound, JsonResponse
 from django.shortcuts import redirect, render
 import django.contrib.auth.models as AuthModels
 from django.contrib.auth import authenticate
@@ -13,7 +13,7 @@ from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.db.models import Q
 from django.utils import timezone
 from CodePlay.models.Accounts import SessionPool, User
-from CodePlay.models.Paint import Scheme
+from CodePlay.models.Paint import Scheme, Sketch
 
 from utils.Accounts import getSessionId, setSessionId, verifySessionId
 
@@ -29,23 +29,24 @@ def userinfo(req):
             return HttpResponseBadRequest('Please query with sessionId')
         user = verifySessionId(sessionId)
         if not user:
-            return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
+            return JsonResponse(({"err": "not_logged_in"}))
         if user['role'] == 'User':
             user.pop('_state')
-            return HttpResponse(json.dumps(user, ensure_ascii=False))
+            return JsonResponse((user))
         else:
             if not queryId:
                 user.pop('_state')
-                return HttpResponse(json.dumps(user, ensure_ascii=False))
+                return JsonResponse((user))
             else:
                 qUser = User.objects.filter(student_id=queryId).first()
                 if not qUser:
                     return HttpResponseBadRequest(json.dumps({"err": "not_found"}))
                 qUser.pop('_state')
-                return HttpResponse(json.dumps(qUser, ensure_ascii=False))
+                return JsonResponse((qUser))
     else:
         # Verify and promote to Designer with 339BD665D02F8C3E8DD262B59D67A904
         POST = json.loads(req.body)
+        print(POST)
         sessionId = POST.get('sessionId')
         key = POST.get('key')
         if not sessionId:
@@ -56,13 +57,13 @@ def userinfo(req):
         user = sessionRecord.user
         if (not key):
             return HttpResponseBadRequest('bad request')
-        if key != '339BD665D02F8C3E8DD262B59D67A904':
-            return HttpResponse(json.dumps({"status": "key verification failed"}, ensure_ascii=False))
+        if key != '339bd665d02f8c3e8dd262b59d67a904':
+            return JsonResponse(({"status": "key verification failed"}))
         user.role = "Designer"
         user.save()
         dic = user.__dict__
         dic.pop('_state')
-        return HttpResponse(json.dumps(dic, ensure_ascii=False))
+        return JsonResponse((dic))
 
 def userScheme(req):
     if req.method == 'GET':
@@ -107,7 +108,7 @@ def userScheme(req):
             sortMethod = sortDict['submission_time']
         sortedSchemeList = sorted(SchemeList, key=sortMethod[0], reverse=sortMethod[1])
         result['schemes'] = sortedSchemeList
-        return HttpResponse(json.dumps(result, ensure_ascii=False))
+        return JsonResponse((result))
     else:
         # Do operations on color scheme, including creating, editing, voting.
         POST = json.loads(req.body)
@@ -121,11 +122,11 @@ def userScheme(req):
         sketch_id = POST.get('sketch_id')
         
         if operation == 'create':
-            scheme = Scheme(sketch_id=sketch_id, name=name, description=description, author_id=author_id, colors=json.dumps(colors, ensure_ascii=False))
+            scheme = Scheme(sketch_id=sketch_id, name=name, description=description, author_id=author_id, colors=json.dumps(colors))
             scheme.save()
             dic = scheme.__dict__
             dic.pop('_state')
-            return HttpResponse(json.dumps(dic, ensure_ascii=False))
+            return JsonResponse((dic))
         elif operation == 'update':
 
             scheme = Scheme.objects.filter(id=schemeId).first()
@@ -137,7 +138,7 @@ def userScheme(req):
                 if not user:
                     return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
                 if scheme.author_id != user.student_id:
-                    return HttpResponse(json.dumps({'status': 'permission denied'}))
+                    return JsonResponse(({'status': 'permission denied'}))
                 
                 # Update properties
                 if name:
@@ -145,13 +146,13 @@ def userScheme(req):
                 if description:
                     scheme.description = description
                 if colors:
-                    scheme.colors = json.dumps(colors, ensure_ascii=False)
+                    scheme.colors = json.dumps(colors)
                 scheme.save()
                 dic = scheme.__dict__
                 dic.pop('_state')
-                return HttpResponse(json.dumps(dic, ensure_ascii=False))
+                return JsonResponse((dic))
             else:
-                return HttpResponse(json.dumps({'status': 'not found'}))
+                return JsonResponse(({'status': 'not found'}))
             
         elif operation == 'vote':
             scheme = Scheme.objects.filter(id=schemeId).first()
@@ -160,9 +161,9 @@ def userScheme(req):
                 scheme.save()
                 dic = scheme.__dict__
                 dic.pop('_state')
-                return HttpResponse(json.dumps(dic, ensure_ascii=False))
+                return JsonResponse((dic))
             else:
-                return HttpResponse(json.dumps({'status': 'not found'}))
+                return JsonResponse(({'status': 'not found'}))
             
         elif operation == 'approve':
             
@@ -173,7 +174,7 @@ def userScheme(req):
             if not user:
                 return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
             if user['role'] != 'Designer':
-                return HttpResponse(json.dumps({'status': 'permission denied'}))
+                return JsonResponse(({'status': 'permission denied'}))
 
             scheme = Scheme.objects.filter(id=schemeId).first()
             if scheme:
@@ -181,9 +182,9 @@ def userScheme(req):
                 scheme.save()
                 dic = scheme.__dict__
                 dic.pop('_state')
-                return HttpResponse(json.dumps(dic, ensure_ascii=False))
+                return JsonResponse((dic))
             else:
-                return HttpResponse(json.dumps({'status': 'not found'}))
+                return JsonResponse(({'status': 'not found'}))
             
         elif operation == 'disapprove':
             
@@ -193,8 +194,8 @@ def userScheme(req):
             user = verifySessionId(sessionId)
             if not user:
                 return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
-            if user['role'] != 'Designer':
-                return HttpResponse(json.dumps({'status': 'permission denied'}))
+            if user['role'] != 'Designer': 
+                return JsonResponse(({'status': 'permission denied'}))
 
             scheme = Scheme.objects.filter(id=schemeId).first()
             if scheme:
@@ -202,9 +203,9 @@ def userScheme(req):
                 scheme.save()
                 dic = scheme.__dict__
                 dic.pop('_state')
-                return HttpResponse(json.dumps(dic, ensure_ascii=False))
+                return JsonResponse((dic))
             else:
-                return HttpResponse(json.dumps({'status': 'not found'}))
+                return JsonResponse(({'status': 'not found'}))
 
         elif operation == 'delete':
             deletedScheme = Scheme.objects.filter(id=schemeId).first()
@@ -217,15 +218,15 @@ def userScheme(req):
                 if not user:
                     return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
                 if deletedScheme.author_id != user.student_id:
-                    return HttpResponse(json.dumps({'status': 'permission denied'}))
+                    return JsonResponse(({'status': 'permission denied'}))
                 
                 deletedScheme.hidden = True
                 deletedScheme.save()
                 dic = deletedScheme.__dict__
                 dic.pop('_state')
-                return HttpResponse(json.dumps(dic, ensure_ascii=False))
+                return JsonResponse((dic))
             else:
-                return HttpResponse(json.dumps({'status': 'not found'}))
+                return JsonResponse(({'status': 'not found'}))
 
 def exploreScheme(req):
     sketch_id = req.GET.get('sketch_id')
@@ -268,7 +269,7 @@ def exploreScheme(req):
                 dic['author'] = model_to_dict(schemeList[i].author)
                 result['schemes'].append(dic)
         result['schemes'] = sorted(result['schemes'], key=sortMethod[0], reverse=sortMethod[1])
-        return HttpResponse(json.dumps(result, ensure_ascii=False))
+        return JsonResponse((result))
     else:
         schemeList = Scheme.objects.filter(hidden=False)
         length = len(schemeList)
@@ -278,6 +279,11 @@ def exploreScheme(req):
             dic.pop('_state')
             dic['colors'] = list(eval(dic['colors']))
             result['schemes'].append(dic)
-        return HttpResponse(json.dumps(result, ensure_ascii=False))
-        
-        
+        return JsonResponse((result))
+
+def sketch(req):
+    sketchList = Sketch.objects.filter(hidden=False).all()
+    result = []
+    for i in sketchList:
+        result.append( model_to_dict(i) )
+    return JsonResponse({"sketch_list": result})

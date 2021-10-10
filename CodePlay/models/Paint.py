@@ -15,3 +15,12 @@ class Scheme(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     hidden = models.BooleanField(default=False)
     colors = models.TextField()
+
+# Create Sketches manually
+class Sketch(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    name = models.TextField()
+    colors = models.IntegerField()
+    data = models.TextField()
+    hidden = models.BooleanField(default=False)
+    defaultValue = models.TextField()
