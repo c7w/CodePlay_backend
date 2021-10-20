@@ -1,6 +1,6 @@
 import random
 from django import db
-from django.db import models
+from django.db import models, reset_queries
 from django.forms.models import model_to_dict
 import requests
 import json
@@ -78,14 +78,14 @@ def userScheme(req):
             return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
 
         if queryId and user['role'] == 'Designer':
-            qUser = User.objects.filter(student_id=queryId).first()
+            qUser = User.objects.filter(student_id=queryId).first().__dict__
             if not qUser:
                     return HttpResponseBadRequest(json.dumps({"err": "not_found"}))
         user.pop('_state')
         result = {"request_user": user}
-        if qUser:
-            user = qUser
         try:
+            if qUser:
+                user = qUser
             user.pop('_state')
         except:
             pass
@@ -93,21 +93,28 @@ def userScheme(req):
         
         # Get all color schemes for user
         if result['request_user']['role'] == 'User':
-            SchemeList = Scheme.objects.filter(hidden=False).filter(author_id=user['id']).all()
+            SchemeList = Scheme.objects.filter(hidden=False).filter(
+                author_id=user['student_id']).all()
         else:
-            SchemeList = Scheme.objects.filter(author_id=user['id']).all()
+            SchemeList = Scheme.objects.filter(author_id=user['student_id']).all()
         # Sort
         sortDict = {
-            "submission_time": (lambda x : x['submission_time'], False),
-            "vote": (lambda x: x['likes'], True),
-            "hue": (lambda x: x['colors'][0][4], False ),
+            "submission_time": (lambda x : x.submission_time, False),
+            "vote": (lambda x: x.likes, True),
+            "hue": (lambda x: list(eval(x.colors))[0][4], False ),
         }
         try:
             sortMethod = sortDict[sortStrategy]
         except:
             sortMethod = sortDict['submission_time']
         sortedSchemeList = sorted(SchemeList, key=sortMethod[0], reverse=sortMethod[1])
-        result['schemes'] = sortedSchemeList
+        result['schemes'] = []
+        for scheme in sortedSchemeList:
+            dic = dict(scheme.__dict__)
+            dic.pop('_state')
+            dic['author'] = dict(scheme.author.__dict__)
+            dic['author'].pop('_state')
+            result['schemes'].append(dic)
         return JsonResponse((result))
     else:
         # Do operations on color scheme, including creating, editing, voting.
@@ -217,7 +224,7 @@ def userScheme(req):
                 user = verifySessionId(sessionId)
                 if not user:
                     return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
-                if deletedScheme.author_id != user.student_id:
+                if deletedScheme.author_id != user['student_id']:
                     return JsonResponse(({'status': 'permission denied'}))
                 
                 deletedScheme.hidden = True
@@ -246,6 +253,7 @@ def exploreScheme(req):
         
         # Approved Only
         schemeList = Scheme.objects.all()
+        #schemeList = [model_to_dict(i) for i in schemeListRaw]
         if approvedOnly:
             schemeList = schemeList.filter(approved=True)
 
