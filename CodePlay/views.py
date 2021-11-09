@@ -1,4 +1,5 @@
 import random
+from typing import cast
 from django import db
 from django.db import models, reset_queries
 from django.forms.models import model_to_dict
@@ -129,6 +130,34 @@ def userScheme(req):
         sketch_id = POST.get('sketch_id')
         
         if operation == 'create':
+            
+            # Verify no schemes under the same user with the same name
+            
+            scheme_list_ = Scheme.objects.filter(author_id=author_id).filter(sketch_id=sketch_id)
+            for another_scheme in scheme_list_:
+                if another_scheme.name == name:
+                    return JsonResponse({"err": "name duplicated"})
+            
+            
+            # Verify no similar schemes
+            scheme_list_ = Scheme.objects.filter(hidden=False).filter(sketch_id=sketch_id)
+            for another_scheme in scheme_list_:
+                this_primary = colors
+                another_scheme_primary = json.loads(another_scheme.colors)
+                
+                for index, color in enumerate(this_primary):
+                    deltaR = this_primary[index][0]-another_scheme_primary[index][0]
+                    deltaG = this_primary[index][1]-another_scheme_primary[index][1]
+                    deltaB = this_primary[index][2]-another_scheme_primary[index][2]
+                    
+                    deltaR **=2
+                    deltaG **=2
+                    deltaB **=2
+                    
+                    if deltaR <= 64 and deltaG <= 64 and deltaB <= 64 and (deltaR + deltaB + deltaG) <= 144:
+                        return JsonResponse({"err": "similar"})
+            
+            
             scheme = Scheme(sketch_id=sketch_id, name=name, description=description, author_id=author_id, colors=json.dumps(colors))
             scheme.save()
             dic = scheme.__dict__
@@ -162,15 +191,62 @@ def userScheme(req):
                 return JsonResponse(({'status': 'not found'}))
             
         elif operation == 'vote':
+            
+            # Verify user permission
+            if not sessionId:
+                return HttpResponseBadRequest('Please query with sessionId')
+            user = verifySessionId(sessionId)
+            if not user:
+                return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
+
             scheme = Scheme.objects.filter(id=schemeId).first()
+            
             if scheme:
-                scheme.likes += 1
-                scheme.save()
-                dic = scheme.__dict__
-                dic.pop('_state')
-                return JsonResponse((dic))
+                try:
+                    people = scheme.voted_people.get(student_id=user['student_id'])
+                    return JsonResponse({'err': 'already_liked'})
+                except:
+                    scheme.likes += 1
+                    scheme.voted_people.add(user['student_id'])
+                    scheme.save()
+                    dic = model_to_dict(scheme)
+                    dic.pop('voted_people')
+                    dic['liked'] = True
+                    return JsonResponse(dic)
             else:
-                return JsonResponse(({'status': 'not found'}))
+                return JsonResponse(({'err': 'not found'}))
+            
+        elif operation == 'unvote':
+            
+            # Verify user permission
+            if not sessionId:
+                return HttpResponseBadRequest('Please query with sessionId')
+            user = verifySessionId(sessionId)
+            if not user:
+                return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
+
+            scheme = Scheme.objects.filter(id=schemeId).first()
+            
+            if scheme:
+                try:
+                    people = scheme.voted_people.get(student_id=user['student_id'])
+                    if people:
+                        scheme.likes -= 1
+                        scheme.voted_people.remove(user['student_id'])
+                        scheme.save()
+                        dic = model_to_dict(scheme)
+                        print(dic)
+                        dic.pop('voted_people')
+                        dic['liked'] = False
+                        return JsonResponse(dic)
+                    else:
+                        raise ""
+                    
+                except:
+                    return JsonResponse({'err': 'not_liked'})
+
+            else:
+                return JsonResponse(({'err': 'not found'}))
             
         elif operation == 'approve':
             
@@ -249,45 +325,42 @@ def exploreScheme(req):
         return HttpResponseBadRequest(json.dumps({"err": "not_logged_in"}))
 
     result = {"schemes": []}
-    if user['role'] == 'Designer':
         
-        # Approved Only
-        schemeList = Scheme.objects.all()
-        #schemeList = [model_to_dict(i) for i in schemeListRaw]
-        if approvedOnly:
-            schemeList = schemeList.filter(approved=True)
+    # Approved Only
+    schemeList = Scheme.objects.all()
+    #schemeList = [model_to_dict(i) for i in schemeListRaw]
+    if approvedOnly:
+        schemeList = schemeList.filter(approved=True)
 
-        # Sort
-        sortDict = {
-            "submission_time": (lambda x: x['submission_time'], False),
-            "vote": (lambda x: x['likes'], True),
-            "hue": (lambda x: x['colors'][0][4], False),
-            "designer_name": (lambda x: x['author']['name'], False)
-        }
-        try:
-            sortMethod = sortDict[sortStrategy]
-        except:
-            sortMethod = sortDict['submission_time']
-        
-        length = len(schemeList)
-        if length != 0:
-            for i in range(0, length):
-                dic = model_to_dict(schemeList[i])
-                dic['colors'] = list(eval(dic['colors']))
-                dic['author'] = model_to_dict(schemeList[i].author)
-                result['schemes'].append(dic)
-        result['schemes'] = sorted(result['schemes'], key=sortMethod[0], reverse=sortMethod[1])
-        return JsonResponse((result))
-    else:
-        schemeList = Scheme.objects.filter(hidden=False)
-        length = len(schemeList)
-        if length != 0:
-            i = random.randint(0, length-1)
-            dic = schemeList[i].__dict__
-            dic.pop('_state')
+    # Sort
+    sortDict = {
+        "submission_time": (lambda x: x['submission_time'], False),
+        "vote": (lambda x: x['likes'], True),
+        "hue": (lambda x: x['colors'][0][4], False),
+        "designer_name": (lambda x: x['author']['name'], False)
+    }
+    try:
+        sortMethod = sortDict[sortStrategy]
+    except:
+        sortMethod = sortDict['submission_time']
+    
+    length = len(schemeList)
+    if length != 0:
+        for i in range(0, length):
+            voted = schemeList[i].voted_people
+            dic = model_to_dict(schemeList[i])
+            try:
+                voted.get(student_id=user['student_id'])
+                dic['liked'] = True
+            except:
+                dic['liked'] = False
+            
+            dic.pop('voted_people')
             dic['colors'] = list(eval(dic['colors']))
+            dic['author'] = model_to_dict(schemeList[i].author)
             result['schemes'].append(dic)
-        return JsonResponse((result))
+    result['schemes'] = sorted(result['schemes'], key=sortMethod[0], reverse=sortMethod[1])
+    return JsonResponse((result))
 
 def sketch(req):
     sketchList = Sketch.objects.filter(hidden=False).all()

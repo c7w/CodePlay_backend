@@ -1,5 +1,6 @@
 import datetime
 from django.db import models
+from CodePlay.models import Accounts
 from django.db.models.fields import BigAutoField
 
 from CodePlay.models.Accounts import User
@@ -11,6 +12,7 @@ class Scheme(models.Model):
     name = models.TextField()
     description = models.TextField()
     likes = models.BigIntegerField(default=0)
+    voted_people = models.ManyToManyField(Accounts.User, related_name='scheme_voted')
     approved = models.BooleanField(default=False)
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     hidden = models.BooleanField(default=False)
