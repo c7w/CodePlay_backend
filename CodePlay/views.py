@@ -144,6 +144,7 @@ def userScheme(req):
             for another_scheme in scheme_list_:
                 this_primary = colors
                 another_scheme_primary = json.loads(another_scheme.colors)
+                similar = 0
                 
                 for index, color in enumerate(this_primary):
                     deltaR = this_primary[index][0]-another_scheme_primary[index][0]
@@ -155,7 +156,9 @@ def userScheme(req):
                     deltaB **=2
                     
                     if deltaR <= 64 and deltaG <= 64 and deltaB <= 64 and (deltaR + deltaB + deltaG) <= 144:
-                        return JsonResponse({"err": "similar"})
+                        similar += 1
+                if similar == len(this_primary):
+                    return JsonResponse({"err": "similar"})
             
             
             scheme = Scheme(sketch_id=sketch_id, name=name, description=description, author_id=author_id, colors=json.dumps(colors))
