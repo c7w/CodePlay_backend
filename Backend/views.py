@@ -24,11 +24,17 @@ def index(req):
     
     # If sessionId does not exist, then the user cannot be logged in
     if not sessionId:
-        res = redirect('/')
+        res = redirect('/login')
         setSessionId(res)
         return res
     
-    return render(req, 'base.html')
+    user = verifySessionId(sessionId)
+    if user:
+        return render(req, 'index.html')
+    else:
+        return render(req, 'login.html')
+    
+    
 
 def login(req):
     sessionId = getSessionId(req)
