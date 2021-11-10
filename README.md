@@ -1,5 +1,19 @@
 # Codeplay_backend
 
+## Deploy
+
+修改前端的内容，特别是 Settings.tsx，**注意地址不要加最后的slash `/`**
+
+使用yarn build 或者 npx react-scripts build
+
+后端删掉templates 里面的 index.html ， static 里面的 css js 文件夹
+
+把build 里面的 index.html, ./static/css, ./static/js 放到刚刚删掉的位置
+
+修改后端的 Backend/settings.py 里面的服务器地址，**注意不要加最后的slash `/`**
+
+
+
 ## Routing
 
 ### `/`
