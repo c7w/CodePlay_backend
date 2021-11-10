@@ -24,7 +24,7 @@ def index(req):
     
     # If sessionId does not exist, then the user cannot be logged in
     if not sessionId:
-        res = redirect('/login')
+        res = redirect('/')
         setSessionId(res)
         return res
     
