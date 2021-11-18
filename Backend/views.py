@@ -15,6 +15,7 @@ from django.utils import timezone
 from CodePlay.models.Accounts import SessionPool, User
 
 from utils.Accounts import getSessionId, setSessionId, verifySessionId
+from utils.Info import read
 
 # Create your views here.
 
@@ -32,7 +33,8 @@ def index(req):
     if user:
         return render(req, 'index.html')
     else:
-        return render(req, 'login.html')
+        props = {"broadcast": read('broadcast').split('\n')}
+        return render(req, 'login.html', props)
     
     
 

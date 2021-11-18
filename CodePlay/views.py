@@ -17,6 +17,7 @@ from CodePlay.models.Accounts import SessionPool, User
 from CodePlay.models.Paint import Scheme, Sketch
 
 from utils.Accounts import getSessionId, setSessionId, verifySessionId
+from utils.Info import read
 
 # Create your views here.
 
@@ -371,3 +372,12 @@ def sketch(req):
     for i in sketchList:
         result.append( model_to_dict(i) )
     return JsonResponse({"sketch_list": result})
+
+def randomName(req):
+    A = read('A')
+    B = read('B')
+    a = A.split('\n')
+    b = B.split('\n')
+    ap = random.randint(0, len(a)-1)
+    bp = random.randint(0, len(b)-1)
+    return JsonResponse( { "name": a[ap] + '的' + b[bp] })

@@ -7,4 +7,5 @@ urlpatterns = [
     path('userScheme', views.userScheme),
     path('exploreScheme', views.exploreScheme),
     path('sketch', views.sketch),
+    path('randomName', views.randomName),
 ]

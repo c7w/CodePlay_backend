@@ -40,6 +40,11 @@
           酒井 ID 登录
         </button>
       </div>
+      <div class="broadcast">
+        {% for b in broadcast%}
+        <p>{{b | safe}}</p>
+        {% endfor %}
+      </div>
     </main>
     <footer>
       <div class="footer-container">
